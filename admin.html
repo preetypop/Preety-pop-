@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - Preety Pop</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Poppins', sans-serif; background: #f4f6f8; margin: 0; padding: 20px; }
+        h1 { text-align: center; color: #e75480; }
+        
+        /* LOGIN STYLE */
+        #loginBox { max-width: 300px; margin: 100px auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); text-align: center; }
+        input { width: 90%; padding: 10px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 5px; }
+        button { background: #e75480; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        button:hover { background: #d0436d; }
+
+        /* DASHBOARD STYLE */
+        #dashboard { display: none; max-width: 1000px; margin: auto; }
+        .order-card { background: white; padding: 20px; margin-bottom: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); border-left: 5px solid #e75480; transition: 0.3s; }
+        .order-card:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        
+        .row { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; }
+        .details { flex: 1; min-width: 300px; }
+        .actions { text-align: right; min-width: 200px; margin-top: 10px; }
+        
+        strong { color: #333; }
+        p { margin: 5px 0; font-size: 14px; color: #555; }
+        
+        /* STATUS BADGE */
+        .status-badge { padding: 5px 12px; border-radius: 15px; font-size: 12px; font-weight: bold; background: #eee; color: #333; display: inline-block; }
+        .st-ordered { background: #e3f2fd; color: #1976d2; }
+        .st-confirmed { background: #fff3e0; color: #f57c00; }
+        .st-shipped { background: #e0f7fa; color: #0097a7; }
+        .st-out { background: #f3e5f5; color: #7b1fa2; }
+        .st-delivered { background: #e8f5e9; color: #388e3c; }
+
+        select { padding: 8px; border-radius: 5px; border: 1px solid #ccc; cursor: pointer; }
+        .update-btn { background: #2ecc71; margin-left: 5px; }
+        .update-btn:hover { background: #27ae60; }
+
+        .items-list { background: #fafafa; padding: 10px; margin-top: 10px; border-radius: 5px; font-size: 13px; border: 1px solid #eee; }
+
+        /* CUSTOM TOAST NOTIFICATION */
+        #toast {
+            visibility: hidden;
+            min-width: 250px;
+            margin-left: -125px;
+            background-color: #333;
+            color: #fff;
+            text-align: center;
+            border-radius: 50px;
+            padding: 16px;
+            position: fixed;
+            z-index: 1;
+            left: 50%;
+            bottom: 30px;
+            font-size: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        #toast.show { visibility: visible; -webkit-animation: fadein 0.5s, fadeout 0.5s 2.5s; animation: fadein 0.5s, fadeout 0.5s 2.5s; }
+        
+        @keyframes fadein { from {bottom: 0; opacity: 0;} to {bottom: 30px; opacity: 1;} }
+        @keyframes fadeout { from {bottom: 30px; opacity: 1;} to {bottom: 0; opacity: 0;} }
+    </style>
+</head>
+<body>
+
+    <div id="loginBox">
+        <h2>Admin Login 🔒</h2>
+        <input type="password" id="adminPass" placeholder="Enter Password">
+        <button onclick="checkPass()">Login</button>
+        <p id="loginError" style="color:red; font-size:12px; display:none;">Incorrect Password!</p>
+    </div>
+
+    <div id="dashboard">
+        <div style="display:flex; justify-content:space-between; align-items:center; padding-bottom: 20px; border-bottom: 2px solid #ddd; margin-bottom: 20px;">
+            <h1 style="margin:0;">📦 Order Manager</h1>
+            <button onclick="logout()" style="background:#333;">Logout</button>
+        </div>
+        <div id="ordersContainer">Loading orders...</div>
+    </div>
+
+    <div id="toast"></div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+        import { getFirestore, collection, getDocs, doc, updateDoc, orderBy, query } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+          apiKey: "AIzaSyDGcSD2p2HpBk3R4cbDRbV1Z6WFrNorE0s",
+          authDomain: "preety-pop.firebaseapp.com",
+          projectId: "preety-pop",
+          storageBucket: "preety-pop.firebasestorage.app",
+          messagingSenderId: "647940072812",
+          appId: "1:647940072812:web:0da839a2056d826188ff49",
+          measurementId: "G-1V2Y2JENCK"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // --- PASSWORD SYSTEM ---
+        window.checkPass = () => {
+            const pass = document.getElementById('adminPass').value;
+            // Password updated to your choice
+            if(pass === "PREETYpop8180@@") { 
+                document.getElementById('loginBox').style.display = 'none';
+                document.getElementById('dashboard').style.display = 'block';
+                loadOrders();
+            } else {
+                let err = document.getElementById('loginError');
+                err.style.display = 'block';
+                err.innerText = "Incorrect Password ❌";
+            }
+        };
+
+        window.logout = () => location.reload();
+
+        // --- LOAD ORDERS ---
+        async function loadOrders() {
+            const c = document.getElementById('ordersContainer');
+            c.innerHTML = "<p align='center'>Fetching latest data...</p>";
+            
+            const q = query(collection(db, "orders"), orderBy("timestamp", "desc"));
+            const snapshot = await getDocs(q);
+            
+            c.innerHTML = "";
+            if(snapshot.empty) { c.innerHTML = "<p align='center'>No orders found.</p>"; return; }
+
+            snapshot.forEach(docSnap => {
+                let data = docSnap.data();
+                let docId = docSnap.id; 
+                let date = new Date(data.timestamp.seconds * 1000).toLocaleString();
+
+                let itemsHtml = data.items.map(i => `<div>• ${i.name} (x${i.qty})</div>`).join('');
+                
+                // Determine Badge Color Class
+                let st = data.status.toLowerCase();
+                let badgeClass = '';
+                if(st.includes('ordered')) badgeClass = 'st-ordered';
+                else if(st.includes('confirmed')) badgeClass = 'st-confirmed';
+                else if(st.includes('shipped')) badgeClass = 'st-shipped';
+                else if(st.includes('out')) badgeClass = 'st-out';
+                else if(st.includes('delivered')) badgeClass = 'st-delivered';
+
+                c.innerHTML += `
+                <div class="order-card" id="card-${docId}">
+                    <div class="row">
+                        <div class="details">
+                            <p><strong>Order ID:</strong> ${data.orderId} <span id="badge-${docId}" class="status-badge ${badgeClass}">${data.status}</span></p>
+                            <p><strong>Customer:</strong> ${data.name} (<a href="tel:${data.mobile}" style="text-decoration:none; color:#e75480;">${data.mobile}</a>)</p>
+                            <p><strong>Amount:</strong> ₹${data.totalAmount} (${data.paymentMethod})</p>
+                            <p><strong>Address:</strong> ${data.fullAddress}</p>
+                            <p><strong>Date:</strong> ${date}</p>
+                            ${data.txnId ? `<p style="color:green;"><strong>Txn ID:</strong> ${data.txnId}</p>` : ''}
+                            <div class="items-list">
+                                <strong>Items:</strong><br>
+                                ${itemsHtml}
+                            </div>
+                        </div>
+                        <div class="actions">
+                            <select id="status-${docId}">
+                                <option value="Ordered" ${data.status==='Ordered'?'selected':''}>Ordered</option>
+                                <option value="Order Confirmed" ${data.status==='Order Confirmed'?'selected':''}>Order Confirmed</option>
+                                <option value="Shipped" ${data.status==='Shipped'?'selected':''}>Shipped</option>
+                                <option value="Out for Delivery" ${data.status==='Out for Delivery'?'selected':''}>Out for Delivery</option>
+                                <option value="Delivered" ${data.status==='Delivered'?'selected':''}>Delivered</option>
+                            </select>
+                            <button class="update-btn" onclick="updateStatus('${docId}')">Update</button>
+                        </div>
+                    </div>
+                </div>`;
+            });
+
+            // UPDATE FUNCTION
+            window.updateStatus = async (id) => {
+                let newStatus = document.getElementById(`status-${id}`).value;
+                let btn = document.querySelector(`#card-${id} .update-btn`);
+                let originalText = btn.innerText;
+                
+                btn.innerText = "Wait...";
+                btn.disabled = true;
+
+                try {
+                    const orderRef = doc(db, "orders", id);
+                    await updateDoc(orderRef, { status: newStatus });
+                    
+                    // Show Toast
+                    showToast(`Status Updated to: ${newStatus} ✅`);
+                    
+                    // Update Badge Immediately (No Refresh Needed)
+                    let badge = document.getElementById(`badge-${id}`);
+                    badge.innerText = newStatus;
+                    
+                    // Update Badge Color Logic
+                    badge.className = 'status-badge'; // Reset
+                    let st = newStatus.toLowerCase();
+                    if(st.includes('ordered')) badge.classList.add('st-ordered');
+                    else if(st.includes('confirmed')) badge.classList.add('st-confirmed');
+                    else if(st.includes('shipped')) badge.classList.add('st-shipped');
+                    else if(st.includes('out')) badge.classList.add('st-out');
+                    else if(st.includes('delivered')) badge.classList.add('st-delivered');
+
+                } catch(e) {
+                    showToast("Error: " + e.message);
+                } finally {
+                    btn.innerText = originalText;
+                    btn.disabled = false;
+                }
+            };
+        }
+
+        // TOAST FUNCTION
+        function showToast(message) {
+            var x = document.getElementById("toast");
+            x.className = "show";
+            x.innerText = message;
+            setTimeout(function(){ x.className = x.className.replace("show", ""); }, 3000);
+        }
+    </script>
+</body>
+</html>
